@@ -24,3 +24,7 @@ Needs Go (`brew install go`) and the Xcode command-line tools.
 ## Tested
 
 Tested on an iPhone running iOS 27.0 (2026-10-15): about 2s from launch to ready, 0.1s per Change Location, and 15/15 route updates at 1 Hz succeeded. The first location channel over a fresh tunnel once took about 10s, so the helper opens it during setup.
+
+## License
+
+MIT. Built on [go-ios](https://github.com/danielpaulus/go-ios) (MIT, © Daniel Paulus). Not affiliated with Apple. Respect the terms of the apps you use it with.
