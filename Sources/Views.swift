@@ -28,6 +28,9 @@ struct ContentView: View {
             }
         }
         .onSubmit(of: .search) { pick(nil) }
+        .sheet(isPresented: Binding(get: { model.keepStep != nil }, set: { if !$0 { model.endKeep() } })) {
+            KeepSheet()
+        }
     }
 
     private func pick(_ r: MKLocalSearchCompletion?) {
@@ -39,6 +42,94 @@ struct ContentView: View {
             model.place(place)
             model.fly(to: place.coordinate)
             search.query = ""
+        }
+    }
+}
+
+// MARK: - Keep after unplugging
+
+struct KeepSheet: View {
+    @Environment(AppModel.self) private var model
+
+    private enum Mark { case done, current, pending }
+
+    var body: some View {
+        let step = model.keepStep ?? .turnOffDevMode
+        let place = model.keptPlace?.name ?? "this location"
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Keep Location After Unplugging").font(.headline)
+                if step == .turnOffDevMode || step == .unplug {
+                    Text("Your iPhone will stay at \(place) until it restarts.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            switch step {
+            case .failed(let why):
+                Label {
+                    Text(why).fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
+            case .done:
+                Label {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Done. Your iPhone is at \(place).")
+                        Text("It goes back to its real location when it restarts. To use Elsewhere again, turn Developer Mode back on, which restarts the phone.")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                }
+            default:
+                VStack(alignment: .leading, spacing: 14) {
+                    row(.done, "Location set", place)
+                    row(step == .turnOffDevMode ? .current : .done,
+                        "Turn off Developer Mode",
+                        "On your iPhone, open Settings › Privacy & Security › Developer Mode and turn it off. Leave the cable in.")
+                    row(step == .unplug ? .current : .pending,
+                        "Unplug your iPhone",
+                        "Keep Elsewhere open until you do.")
+                }
+            }
+
+            HStack {
+                Spacer()
+                switch step {
+                case .done, .failed:
+                    Button("Done") { model.endKeep() }
+                        .keyboardShortcut(.defaultAction)
+                default:
+                    Button("Cancel") { model.endKeep() }
+                        .keyboardShortcut(.cancelAction)
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 440)
+    }
+
+    private func row(_ mark: Mark, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Group {
+                switch mark {
+                case .done:
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                case .current:
+                    ProgressView().controlSize(.small)
+                case .pending:
+                    Image(systemName: "circle").foregroundStyle(.tertiary)
+                }
+            }
+            .frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).fontWeight(mark == .current ? .semibold : .regular)
+                    .foregroundStyle(mark == .pending ? .secondary : .primary)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
@@ -396,6 +487,10 @@ struct ActionBar: View {
 
     @ViewBuilder private var buttons: some View {
         let ready = model.deviceReady
+        if model.canKeep {
+            Button("Keep After Unplugging…") { model.beginKeep() }
+                .help("Leave the iPhone at this location after you disconnect it")
+        }
         switch model.mode {
         case .fixed:
             Button("Reset Location") { Task { await model.resetLocation() } }

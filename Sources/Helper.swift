@@ -66,7 +66,12 @@ final class HelperBridge {
     func stop() {
         stopping = true
         try? input?.close()
-        process?.waitUntilExit()
+        // The helper gives up on unresponsive phones after 2s; don't wait on it much longer.
+        let deadline = Date().addingTimeInterval(3)
+        while let p = process, p.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if let p = process, p.isRunning { p.terminate() }
     }
 
     func setLocation(udid: String, lat: Double, lon: Double) async throws {

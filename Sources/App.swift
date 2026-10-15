@@ -22,6 +22,8 @@ struct ElsewhereApp: App {
                 Button("Reset Location") { Task { await model.resetLocation() } }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                     .disabled(!model.deviceReady)
+                Button("Keep After Unplugging…") { model.beginKeep() }
+                    .disabled(!model.canKeep)
                 Divider()
                 Button("Static Mode") { model.setMode(.fixed) }.keyboardShortcut("1")
                 Button("Route Mode") { model.setMode(.route) }.keyboardShortcut("2")

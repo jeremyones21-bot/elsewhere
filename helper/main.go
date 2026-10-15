@@ -70,6 +70,7 @@ type phone struct {
 	pairTried bool
 	revealed  bool
 	loc       *instruments.LocationSimulationService
+	detached  []*instruments.LocationSimulationService // kept open on purpose; see advance
 }
 
 type helper struct {
@@ -116,17 +117,28 @@ func main() {
 
 	h.readCommands(os.Stdin)
 
-	// stdin closed: the app quit. Leave the phone at its real location.
+	// stdin closed: the app quit. Put each phone back at its real location, but never let a
+	// phone that stopped answering hold up the exit.
 	cancel()
 	h.mu.Lock()
+	var wg sync.WaitGroup
 	for _, p := range h.phones {
-		p.mu.Lock()
-		if p.loc != nil {
-			_ = p.loc.StopSimulateLocation()
+		if p.loc == nil {
+			continue
 		}
-		p.mu.Unlock()
+		wg.Add(1)
+		go func(l *instruments.LocationSimulationService) {
+			defer wg.Done()
+			_ = l.StopSimulateLocation()
+		}(p.loc)
 	}
 	h.mu.Unlock()
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+	}
 }
 
 func (h *helper) emit(v any) {
@@ -277,6 +289,13 @@ func (h *helper) advance(p *phone) {
 	if p.major >= 16 {
 		on, err := imagemounter.IsDevModeEnabled(p.entry)
 		if err == nil && !on {
+			// Developer Mode just went off with a location set: that is how a location is kept
+			// after unplugging. Let go of the channel without stopping or closing it, so
+			// nothing we do afterwards (unplug, quit) can undo the location.
+			if p.loc != nil {
+				p.detached = append(p.detached, p.loc)
+				p.loc = nil
+			}
 			if !p.revealed {
 				p.revealed = true
 				if c, err := amfi.New(p.entry); err == nil {

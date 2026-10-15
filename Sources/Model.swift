@@ -74,6 +74,7 @@ final class AppModel {
     var deviceReady: Bool { device?.state == .ready }
 
     private func updateDevices(_ list: [Device], _ problem: String?) {
+        advanceKeep(list)
         devices = list.sorted { $0.name < $1.name }
         helperProblem = problem
         if selectedUDID == nil || !devices.contains(where: { $0.udid == selectedUDID }) {
@@ -82,6 +83,55 @@ final class AppModel {
         if device == nil {
             simulated = nil
             if playing { stopPlayback(reset: false) }
+        }
+    }
+
+    // MARK: Keep after unplugging
+    //
+    // Turning Developer Mode off while a location is set shuts the phone's developer service
+    // down without cancelling the location, so it survives unplugging until the phone restarts.
+    // We can't read the phone's location back, so each step is confirmed from what the helper
+    // sees: Developer Mode off while still connected, then the phone gone from USB.
+
+    enum KeepStep: Equatable {
+        case turnOffDevMode, unplug, done
+        case failed(String)
+    }
+
+    var keepStep: KeepStep?
+    var keptPlace: Place?
+    private var keepUDID: String?
+
+    var canKeep: Bool { deviceReady && simulated != nil && !playing && !working }
+
+    func beginKeep() {
+        guard canKeep, let c = simulated, let udid = selectedUDID else { return }
+        let atPin = pin.map { $0.latitude == c.latitude && $0.longitude == c.longitude } ?? false
+        let name = atPin && !pinName.isEmpty ? pinName : Self.coordinateText(c)
+        keptPlace = Place(name: name, c)
+        keepUDID = udid
+        keepStep = .turnOffDevMode
+    }
+
+    func endKeep() {
+        keepStep = nil
+        keepUDID = nil
+    }
+
+    private func advanceKeep(_ list: [Device]) {
+        guard let step = keepStep, let udid = keepUDID else { return }
+        let d = list.first { $0.udid == udid }
+        switch step {
+        case .turnOffDevMode:
+            if d == nil {
+                keepStep = .failed("The iPhone was unplugged while Developer Mode was still on, so it has most likely gone back to its real location. Plug it back in to try again.")
+            } else if d?.state == .devmode {
+                keepStep = .unplug
+            }
+        case .unplug:
+            if d == nil { keepStep = .done }
+        case .done, .failed:
+            break
         }
     }
 

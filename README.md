@@ -17,7 +17,7 @@ Needs Go (`brew install go`) and the Xcode command-line tools.
 ## Gotchas
 
 - **iOS clears the simulated location when the LocationSimulation channel closes.** The go-ios CLI `setlocation` blocks until Ctrl-C for this reason. The helper keeps one channel open per phone. Spawning a process per update would make routes flicker back to the real location.
-- Quitting the app closes the helper's stdin, and the helper stops the simulation. To keep a fake location after unplugging, set it, then turn Developer Mode off on the phone before disconnecting. It holds until reboot.
+- Quitting the app closes the helper's stdin, and the helper stops the simulation (giving up after 2s). **Keep After Unplugging** (Location menu or action bar) walks through the Developer Mode trick: once the helper sees Developer Mode off, it detaches the location channel without stopping or closing it, so unplugging and quitting can't undo the location. It holds until the phone restarts. The app can't read the phone's location back, so the steps are confirmed from Developer Mode state and USB presence.
 - MapKit has no cycling directions on macOS, so Cycle uses walking paths at 5 m/s. Speeds: walk 1.4 m/s, drive 13 m/s, with one update per second.
 - The tunnel-info port is 28150, so a separate `ios tunnel start` agent on 28100 can run alongside.
 
