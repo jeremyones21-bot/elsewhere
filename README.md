@@ -21,6 +21,6 @@ Needs Go (`brew install go`) and the Xcode command-line tools.
 - MapKit has no cycling directions on macOS, so Cycle uses walking paths at 5 m/s. Speeds: walk 1.4 m/s, drive 13 m/s, with one update per second.
 - The tunnel-info port is 28150, so a separate `ios tunnel start` agent on 28100 can run alongside.
 
-## Not verified yet
+## Tested
 
-The phone side (tunnel, image mount, location set) has not run against a real iPhone. The app UI, helper protocol and MapKit search/routing have been checked.
+Tested on an iPhone running iOS 27.0 (2026-10-15): about 2s from launch to ready, 0.1s per Change Location, and 15/15 route updates at 1 Hz succeeded. The first location channel over a fresh tunnel once took about 10s, so the helper opens it during setup.

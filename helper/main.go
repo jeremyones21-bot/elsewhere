@@ -335,6 +335,23 @@ func (h *helper) advance(p *phone) {
 		p.imageOK = true
 	}
 
+	// 5. Open the location channel now. The first one over a fresh tunnel takes ~10s on
+	// iOS 27; later ones take ~0.1s. Paying it here keeps Change Location instant.
+	// Opening the channel doesn't move the phone; only a simulate call does.
+	if p.loc == nil {
+		if p.info.State != stateReady {
+			set(statePreparing, "Connecting to location service…")
+			h.emitSingle(p)
+		}
+		svc, err := instruments.NewLocationSimulationService(target)
+		if err != nil {
+			p.rsd, p.imageOK = nil, false
+			set(stateTunnel, "Connecting…")
+			return
+		}
+		p.loc = svc
+	}
+
 	set(stateReady, "")
 }
 
